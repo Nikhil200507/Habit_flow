@@ -9,19 +9,6 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List
 
-# Import models and auth
-from .models import (
-    User, UserCreate, UserLogin, UserResponse,
-    Habit, HabitCreate, HabitUpdate, HabitWithStats,
-    HabitCompletion, HabitCompletionCreate,
-    StatsOverview, CalendarData, Token
-)
-from .auth import (
-    authenticate_user, create_access_token, get_current_user,
-    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
-)
-from .utils import calculate_streaks, get_week_performance, get_completion_rate
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -29,6 +16,19 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Import models and functions
+from models import (
+    User, UserCreate, UserLogin, UserResponse,
+    Habit, HabitCreate, HabitUpdate, HabitWithStats,
+    HabitCompletion, HabitCompletionCreate,
+    StatsOverview, CalendarData, Token
+)
+from auth import (
+    authenticate_user, create_access_token, get_current_user,
+    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
+)
+from utils import calculate_streaks, get_week_performance, get_completion_rate
 
 # Create the main app without a prefix
 app = FastAPI()
