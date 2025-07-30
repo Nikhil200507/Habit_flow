@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useToast } from '../../hooks/use-toast';
+import { habitsAPI } from '../../services/api';
 import { 
   Droplets, 
   Brain, 
@@ -62,13 +63,13 @@ const habitColors = [
   { value: '#6366F1', label: 'Indigo' },
 ];
 
-const AddHabitDialog = ({ open, onOpenChange }) => {
+const AddHabitDialog = ({ open, onOpenChange, onHabitCreated }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     icon: 'brain',
     color: '#3B82F6',
-    targetDays: 30
+    target_days: 30
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -87,26 +88,39 @@ const AddHabitDialog = ({ open, onOpenChange }) => {
 
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock success
-    toast({
-      title: "Habit created! 🎉",
-      description: `"${formData.name}" has been added to your habits.`
-    });
-    
-    // Reset form
-    setFormData({
-      name: '',
-      description: '',
-      icon: 'brain',
-      color: '#3B82F6',
-      targetDays: 30
-    });
-    
-    setIsSubmitting(false);
-    onOpenChange(false);
+    try {
+      const newHabit = await habitsAPI.createHabit(formData);
+      
+      toast({
+        title: "Habit created! 🎉",
+        description: `"${formData.name}" has been added to your habits.`
+      });
+      
+      // Reset form
+      setFormData({
+        name: '',
+        description: '',
+        icon: 'brain',
+        color: '#3B82F6',
+        target_days: 30
+      });
+      
+      // Notify parent component to refresh habits
+      if (onHabitCreated) {
+        onHabitCreated(newHabit);
+      }
+      
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to create habit:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create habit. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const selectedIcon = habitIcons.find(icon => icon.value === formData.icon);
@@ -206,8 +220,8 @@ const AddHabitDialog = ({ open, onOpenChange }) => {
           <div className="space-y-2">
             <Label htmlFor="targetDays">Target Goal (Days)</Label>
             <Select 
-              value={formData.targetDays.toString()} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, targetDays: parseInt(value) }))}
+              value={formData.target_days.toString()} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, target_days: parseInt(value) }))}
               disabled={isSubmitting}
             >
               <SelectTrigger>

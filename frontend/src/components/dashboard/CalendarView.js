@@ -1,19 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Calendar } from '../ui/calendar';
 import { Badge } from '../ui/badge';
-import { mockHabits } from '../../mock';
+import { Skeleton } from '../ui/skeleton';
+import { habitsAPI } from '../../services/api';
+import { useToast } from '../../hooks/use-toast';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 
 const CalendarView = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [habits, setHabits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchHabits = async () => {
+      try {
+        const habitsData = await habitsAPI.getHabits();
+        setHabits(habitsData);
+      } catch (error) {
+        console.error('Failed to fetch habits:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load habits",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHabits();
+  }, [toast]);
 
   // Get all completion dates from all habits
   const getAllCompletionDates = () => {
     const allDates = new Set();
-    mockHabits.forEach(habit => {
-      habit.completedDates.forEach(date => {
+    habits.forEach(habit => {
+      habit.completed_dates?.forEach(date => {
         allDates.add(date);
       });
     });
@@ -23,13 +48,51 @@ const CalendarView = () => {
   // Get habits completed on a specific date
   const getHabitsForDate = (date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return mockHabits.filter(habit => 
-      habit.completedDates.includes(dateStr)
+    return habits.filter(habit => 
+      habit.completed_dates?.includes(dateStr)
     );
   };
 
   const completionDates = getAllCompletionDates();
   const selectedDateHabits = getHabitsForDate(selectedDate);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-6 w-48" />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-32" />
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -138,11 +201,11 @@ const CalendarView = () => {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
-            {mockHabits.map((habit) => {
+            {habits.map((habit) => {
               const currentMonth = selectedMonth.getMonth();
               const currentYear = selectedMonth.getFullYear();
               
-              const monthCompletions = habit.completedDates.filter(date => {
+              const monthCompletions = (habit.completed_dates || []).filter(date => {
                 const completionDate = new Date(date);
                 return completionDate.getMonth() === currentMonth && 
                        completionDate.getFullYear() === currentYear;

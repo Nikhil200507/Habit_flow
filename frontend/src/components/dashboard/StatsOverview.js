@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Badge } from '../ui/badge';
-import { mockHabits } from '../../mock';
+import { Skeleton } from '../ui/skeleton';
+import { statsAPI, habitsAPI } from '../../services/api';
+import { useToast } from '../../hooks/use-toast';
 import { 
   TrendingUp, 
   Target, 
@@ -34,8 +36,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color }) => (
 );
 
 const HabitProgressCard = ({ habit }) => {
-  const completionRate = Math.round((habit.completedDates.length / habit.targetDays) * 100);
-  const daysRemaining = Math.max(0, habit.targetDays - habit.completedDates.length);
+  const completionRate = Math.round((habit.completion_count / habit.target_days) * 100);
+  const daysRemaining = Math.max(0, habit.target_days - habit.completion_count);
   
   return (
     <Card>
@@ -50,7 +52,7 @@ const HabitProgressCard = ({ habit }) => {
           <div className="flex-1 min-w-0">
             <p className="font-medium truncate">{habit.name}</p>
             <p className="text-xs text-muted-foreground">
-              {habit.completedDates.length} / {habit.targetDays} days
+              {habit.completion_count} / {habit.target_days} days
             </p>
           </div>
           <Badge variant={completionRate >= 80 ? "default" : completionRate >= 50 ? "secondary" : "outline"}>
@@ -62,7 +64,7 @@ const HabitProgressCard = ({ habit }) => {
         
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>{daysRemaining} days remaining</span>
-          <span>🔥 {habit.currentStreak} streak</span>
+          <span>🔥 {habit.current_streak} streak</span>
         </div>
       </CardContent>
     </Card>
@@ -70,40 +72,89 @@ const HabitProgressCard = ({ habit }) => {
 };
 
 const StatsOverview = () => {
-  // Calculate overall stats
-  const totalHabits = mockHabits.length;
-  const totalCompletions = mockHabits.reduce((sum, habit) => sum + habit.completedDates.length, 0);
-  const totalCurrentStreak = mockHabits.reduce((sum, habit) => sum + habit.currentStreak, 0);
-  const longestStreak = Math.max(...mockHabits.map(habit => habit.longestStreak));
-  const avgCompletionRate = Math.round(
-    mockHabits.reduce((sum, habit) => 
-      sum + (habit.completedDates.length / habit.targetDays), 0
-    ) / totalHabits * 100
-  );
+  const [stats, setStats] = useState(null);
+  const [habits, setHabits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Get today's completed habits
-  const today = new Date().toISOString().split('T')[0];
-  const todayCompletions = mockHabits.filter(habit => 
-    habit.completedDates.includes(today)
-  ).length;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statsData, habitsData] = await Promise.all([
+          statsAPI.getOverview(),
+          habitsAPI.getHabits()
+        ]);
+        
+        setStats(statsData);
+        setHabits(habitsData);
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load statistics",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Get habits with active streaks
-  const activeStreaks = mockHabits.filter(habit => habit.currentStreak > 0).length;
+    fetchData();
+  }, [toast]);
 
-  // Calculate this week's performance
-  const thisWeek = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-    const dayCompletions = mockHabits.filter(habit => 
-      habit.completedDates.includes(dateStr)
-    ).length;
-    thisWeek.push({
-      date: dateStr,
-      completions: dayCompletions,
-      day: date.toLocaleDateString('en-US', { weekday: 'short' })
-    });
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-6 w-32" />
+        </div>
+
+        {/* Main Stats Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-8 w-12" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="w-10 h-10 rounded-lg" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Week Performance */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-7 gap-2">
+              {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <div key={i} className="text-center space-y-2">
+                  <Skeleton className="h-4 w-8 mx-auto" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-4 w-4 mx-auto" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">No statistics available</p>
+      </div>
+    );
   }
 
   return (
@@ -119,28 +170,28 @@ const StatsOverview = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Habits"
-          value={totalHabits}
+          value={stats.total_habits}
           subtitle="Active habits"
           icon={Target}
           color="bg-blue-500"
         />
         <StatCard
           title="Today's Progress"
-          value={`${todayCompletions}/${totalHabits}`}
-          subtitle={`${Math.round((todayCompletions/totalHabits)*100)}% complete`}
+          value={`${stats.today_completions}/${stats.total_habits}`}
+          subtitle={`${Math.round((stats.today_completions/Math.max(stats.total_habits, 1))*100)}% complete`}
           icon={Calendar}
           color="bg-green-500"
         />
         <StatCard
           title="Active Streaks"
-          value={activeStreaks}
-          subtitle={`Total: ${totalCurrentStreak} days`}
+          value={stats.active_streaks}
+          subtitle={`Total: ${stats.total_current_streak} days`}
           icon={Flame}
           color="bg-orange-500"
         />
         <StatCard
           title="Best Streak"
-          value={longestStreak}
+          value={stats.longest_streak}
           subtitle="Personal record"
           icon={Trophy}
           color="bg-yellow-500"
@@ -157,7 +208,7 @@ const StatsOverview = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-2">
-            {thisWeek.map((day, index) => (
+            {stats.this_week_performance.map((day, index) => (
               <div key={index} className="text-center">
                 <p className="text-xs text-muted-foreground mb-1">{day.day}</p>
                 <div className="relative">
@@ -165,7 +216,7 @@ const StatsOverview = () => {
                     <div 
                       className="w-full bg-primary rounded transition-all"
                       style={{ 
-                        height: `${Math.max(10, (day.completions / totalHabits) * 100)}%`,
+                        height: `${Math.max(10, (day.completions / Math.max(stats.total_habits, 1)) * 100)}%`,
                         opacity: day.completions > 0 ? 1 : 0.3
                       }}
                     />
@@ -177,27 +228,29 @@ const StatsOverview = () => {
           </div>
           <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
             <span>Daily completions</span>
-            <span>Max: {totalHabits}</span>
+            <span>Max: {stats.total_habits}</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Individual Habit Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="w-5 h-5" />
-            Individual Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            {mockHabits.map((habit) => (
-              <HabitProgressCard key={habit.id} habit={habit} />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {habits.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Individual Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {habits.map((habit) => (
+                <HabitProgressCard key={habit.id} habit={habit} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Performance Insights */}
       <Card>
@@ -214,7 +267,7 @@ const StatsOverview = () => {
                 <Clock className="w-4 h-4" />
                 <span className="font-medium text-sm">Average Completion</span>
               </div>
-              <p className="text-2xl font-bold">{avgCompletionRate}%</p>
+              <p className="text-2xl font-bold">{stats.avg_completion_rate}%</p>
               <p className="text-xs text-muted-foreground">Across all habits</p>
             </div>
             
@@ -223,7 +276,7 @@ const StatsOverview = () => {
                 <Calendar className="w-4 h-4" />
                 <span className="font-medium text-sm">Total Completions</span>
               </div>
-              <p className="text-2xl font-bold">{totalCompletions}</p>
+              <p className="text-2xl font-bold">{stats.total_completions}</p>
               <p className="text-xs text-muted-foreground">Days completed</p>
             </div>
             
@@ -233,7 +286,7 @@ const StatsOverview = () => {
                 <span className="font-medium text-sm">Consistency Score</span>
               </div>
               <p className="text-2xl font-bold">
-                {Math.round((activeStreaks / totalHabits) * 100)}%
+                {Math.round((stats.active_streaks / Math.max(stats.total_habits, 1)) * 100)}%
               </p>
               <p className="text-xs text-muted-foreground">Habits with streaks</p>
             </div>

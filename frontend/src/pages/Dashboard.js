@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import Header from '../components/dashboard/Header';
 import HabitsList from '../components/dashboard/HabitsList';
 import CalendarView from '../components/dashboard/CalendarView';
@@ -13,6 +12,12 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('habits');
   const [showAddHabit, setShowAddHabit] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleHabitCreated = () => {
+    // Trigger refresh of habits list
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,22 +50,23 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="habits" className="space-y-6">
-            <HabitsList />
+            <HabitsList key={refreshTrigger} />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-6">
-            <CalendarView />
+            <CalendarView key={refreshTrigger} />
           </TabsContent>
 
           <TabsContent value="stats" className="space-y-6">
-            <StatsOverview />
+            <StatsOverview key={refreshTrigger} />
           </TabsContent>
         </Tabs>
       </div>
 
       <AddHabitDialog 
         open={showAddHabit} 
-        onOpenChange={setShowAddHabit} 
+        onOpenChange={setShowAddHabit}
+        onHabitCreated={handleHabitCreated}
       />
     </div>
   );
