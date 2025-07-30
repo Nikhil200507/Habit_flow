@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockUser } from '../mock';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -16,51 +16,80 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking for existing session
-    const savedUser = localStorage.getItem('mockUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const userData = await authAPI.getCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          console.error('Failed to get current user:', error);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+        }
+      }
+      setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async (email, password) => {
-    // Mock login
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    
-    if (email === 'demo@example.com' && password === 'password') {
-      setUser(mockUser);
-      localStorage.setItem('mockUser', JSON.stringify(mockUser));
+    try {
+      const tokenData = await authAPI.login(email, password);
+      localStorage.setItem('access_token', tokenData.access_token);
+      
+      // Get user data
+      const userData = await authAPI.getCurrentUser();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      
       setLoading(false);
       return { success: true };
-    } else {
+    } catch (error) {
       setLoading(false);
-      return { success: false, error: 'Invalid credentials' };
+      console.error('Login error:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.detail || 'Login failed' 
+      };
     }
   };
 
   const signup = async (name, email, password) => {
-    // Mock signup
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-    
-    const newUser = {
-      ...mockUser,
-      name,
-      email,
-      id: Date.now().toString()
-    };
-    
-    setUser(newUser);
-    localStorage.setItem('mockUser', JSON.stringify(newUser));
-    setLoading(false);
-    return { success: true };
+    try {
+      // Register user
+      const userData = await authAPI.register(name, email, password);
+      
+      // Auto-login after registration
+      const loginResult = await login(email, password);
+      
+      setLoading(false);
+      return loginResult;
+    } catch (error) {
+      setLoading(false);
+      console.error('Signup error:', error);
+      
+      let errorMessage = 'Registration failed';
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Email already registered';
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
+    }
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('mockUser');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
   };
 
   const value = {
